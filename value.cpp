@@ -215,6 +215,11 @@ const JsonValue &JsonValue::emptyValue()
     return _emptyValue;
 }
 
+bool JsonValue::isEmptyValue() const
+{
+    return this == &_emptyValue;
+}
+
 JsonValue::Iterator JsonValue::begin() const
 {
     return Iterator(this);
@@ -458,6 +463,32 @@ JsonValue& JsonValue::add (const JsonValue& v)
     size_t oldSize = size();
     (*this)[oldSize] = v;
     return (*this)[oldSize];
+}
+
+bool JsonValue::insert(size_t pos, const JsonValue &v)
+{
+    if (_type != ARRAY || pos > _value._a->size())
+    {
+        return false;
+    }
+
+    auto it = _value._a->begin();
+    std::advance(it, pos);
+    _value._a->insert(it, v);
+    return true;
+}
+
+bool JsonValue::insert(size_t pos, const std::string &key, const JsonValue &v)
+{
+    if (_type != OBJECT || pos > _value._a->size())
+    {
+        return false;
+    }
+
+    auto it = _value._o->begin();
+    std::advance(it, pos);
+    _value._o->insert(it, key, v);
+    return true;
 }
 
 JsonValue& JsonValue::operator[] (const std::string& key)

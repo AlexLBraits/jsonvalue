@@ -114,6 +114,9 @@ public:
     JsonValue& operator[](size_t key);
     JsonValue& add(const JsonValue& v);
 
+    bool insert(size_t pos, const JsonValue& v);
+    bool insert(size_t pos, const std::string& key, const JsonValue& v);
+
     const JsonValue& operator[] (const std::string& key) const;
     const JsonValue& operator[] (size_t key) const;
 
@@ -159,6 +162,7 @@ private:
 
 public:
     static const JsonValue& emptyValue();
+    bool isEmptyValue() const;
 
     /////////////////////////////////////////////////////////////////////////
     // Итератор Value сделан для обхода через Range-based for loop
