@@ -195,7 +195,7 @@ public:
         erase (value.first);
 
         auto iter = value_list.insert (position, value);
-        iter_map [value.first] = value;
+        iter_map [value.first] = iter;
 
         return iter;
     }
