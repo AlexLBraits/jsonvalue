@@ -82,7 +82,7 @@ public:
         : _type(ARRAY)
     {
         _value._a = new ArrayContainer(first, last);
-        for (auto& rv : * (_value._a)) rv._owner = this;
+        for (auto& rv : * (_value._a)) rv._parent = this;
     }
 
     template<class T>
@@ -90,7 +90,7 @@ public:
         : _type(OBJECT)
     {
         _value._o = new ObjectContainer(v.begin(), v.end());
-        for (auto& p : *_value._o) p.second._owner = this;
+        for (auto& p : *_value._o) p.second._parent = this;
     }
 
     Type type() const;
@@ -187,7 +187,7 @@ private:
         } _base;
 
     public:
-        Iterator(const JsonValue* owner = 0);
+        Iterator(const JsonValue* parent = 0);
         ~Iterator();
         bool operator!=(const Iterator& v);
         Iterator& operator++();
@@ -200,11 +200,11 @@ public:
     /////////////////////////////////////////////////////////////////////////
     // Набор для поддержания двунаправленной иерархии
 private:
-    const JsonValue* _owner;
+    const JsonValue* _parent;
 
 public:
     // возвращает указатель на контейнер-владелец
-    const JsonValue* owner() const;
+    const JsonValue* parent() const;
     // возвращает указатель на самый верхний контейнер-владелец
     const JsonValue* root() const;
     // возвращает ключ в контейнере-владельце

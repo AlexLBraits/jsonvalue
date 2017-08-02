@@ -40,7 +40,7 @@ KeyValue::KeyValue(JsonValue& v) : value(v)
 //////////////////////////////////////////////////////////////////////////////
 const JsonValue JsonValue::_emptyValue;
 
-JsonValue::JsonValue(Type type) : _type(type), _owner(0)
+JsonValue::JsonValue(Type type) : _type(type), _parent(0)
 {
     switch (_type)
     {
@@ -61,54 +61,54 @@ JsonValue::JsonValue(Type type) : _type(type), _owner(0)
     }
 }
 
-JsonValue::JsonValue(bool v) : _type(BOOLEAN), _owner(0)
+JsonValue::JsonValue(bool v) : _type(BOOLEAN), _parent(0)
 {
     _value._l = v;
 }
 
-JsonValue::JsonValue(int v) : _type(INTEGER), _owner(0)
+JsonValue::JsonValue(int v) : _type(INTEGER), _parent(0)
 {
     _value._i = (long long)v;
 }
 
-JsonValue::JsonValue(long v) : _type(INTEGER), _owner(0)
+JsonValue::JsonValue(long v) : _type(INTEGER), _parent(0)
 {
     _value._i = (long long)v;
 }
 
-JsonValue::JsonValue(long long v) : _type(INTEGER), _owner(0)
+JsonValue::JsonValue(long long v) : _type(INTEGER), _parent(0)
 {
     _value._i = v;
 }
 
-JsonValue::JsonValue(size_t v) : _type(INTEGER), _owner(0)
+JsonValue::JsonValue(size_t v) : _type(INTEGER), _parent(0)
 {
     _value._i = (long long)v;
 }
 
-JsonValue::JsonValue(double v) : _type(NUMBER), _owner(0)
+JsonValue::JsonValue(double v) : _type(NUMBER), _parent(0)
 {
     _value._d = v;
 }
 
-JsonValue::JsonValue(const char* v) : _type(STRING), _owner(0)
+JsonValue::JsonValue(const char* v) : _type(STRING), _parent(0)
 {
     _value._s = new std::string (v);
 }
 
-JsonValue::JsonValue(const std::string& v) : _type(STRING), _owner(0)
+JsonValue::JsonValue(const std::string& v) : _type(STRING), _parent(0)
 {
     _value._s = new std::string (v);
 }
 
-JsonValue::JsonValue(std::string&& v) : _type(STRING), _owner(0)
+JsonValue::JsonValue(std::string&& v) : _type(STRING), _parent(0)
 {
     _value._s = new std::string ();
     std::swap (*(std::string*)_value._s, v);
 }
 
 /* ХИТРЫЙ КОНСТРУКТОР для объектов, прочитанных из потока */
-JsonValue::JsonValue(const char* v, int) : _type(UNDEFINED), _owner(0)
+JsonValue::JsonValue(const char* v, int) : _type(UNDEFINED), _parent(0)
 {
     double d = 0;
     long long l = 0;
@@ -235,18 +235,18 @@ JsonValue::~JsonValue ()
     reset ();
 }
 
-JsonValue::JsonValue(const JsonValue& v) : _type(v._type), _owner(v._owner)
+JsonValue::JsonValue(const JsonValue& v) : _type(v._type), _parent(0)
 {
     switch (_type)
     {
     case OBJECT:
         _value._o = new ObjectContainer (*v._value._o);
-        for (auto& p : *_value._o) p.second._owner = this;
+        for (auto& p : *_value._o) p.second._parent = this;
         break;
 
     case ARRAY:
         _value._a = new ArrayContainer (*v._value._a);
-        for (auto& rv : * (_value._a)) rv._owner = this;
+        for (auto& rv : * (_value._a)) rv._parent = this;
         break;
 
     case STRING:
@@ -260,16 +260,16 @@ JsonValue::JsonValue(const JsonValue& v) : _type(v._type), _owner(v._owner)
 }
 
 JsonValue::JsonValue (JsonValue&& v) : _type(v._type), _value(v._value),
-    _owner(v._owner)
+    _parent(0)
 {
     switch (_type)
     {
     case OBJECT:
-        for (auto& p : *_value._o) p.second._owner = this;
+        for (auto& p : *_value._o) p.second._parent = this;
         break;
 
     case ARRAY:
-        for (auto& rv : * (_value._a)) rv._owner = this;
+        for (auto& rv : * (_value._a)) rv._parent = this;
         break;
 
     default:
@@ -289,12 +289,12 @@ JsonValue& JsonValue::operator= (const JsonValue& v)
     {
     case OBJECT:
         savedValue._o = new ObjectContainer (*v._value._o);
-        for (auto& p : *savedValue._o) p.second._owner = this;
+        for (auto& p : *savedValue._o) p.second._parent = this;
         break;
 
     case ARRAY:
         savedValue._a = new ArrayContainer (*v._value._a);
-        for (auto& rv : * (savedValue._a)) rv._owner = this;
+        for (auto& rv : * (savedValue._a)) rv._parent = this;
         break;
 
     case STRING:
@@ -329,11 +329,11 @@ JsonValue& JsonValue::operator= (JsonValue&& v)
     switch (_type)
     {
     case OBJECT:
-        for (auto& p : *_value._o) p.second._owner = this;
+        for (auto& p : *_value._o) p.second._parent = this;
         break;
 
     case ARRAY:
-        for (auto& rv : * (_value._a)) rv._owner = this;
+        for (auto& rv : * (_value._a)) rv._parent = this;
         break;
 
     default:
@@ -452,7 +452,7 @@ JsonValue& JsonValue::operator[] (size_t key)
 
         auto it = _value._a->begin();
         for (std::advance(it, oldSize); it != _value._a->end(); ++it)
-            it->_owner = this;
+            it->_parent = this;
 
         return _value._a->back ();
     }
@@ -475,6 +475,7 @@ bool JsonValue::insert(size_t pos, const JsonValue &v)
     auto it = _value._a->begin();
     std::advance(it, pos);
     _value._a->insert(it, v);
+    for (auto& rv : * (_value._a)) rv._parent = this;
     return true;
 }
 
@@ -488,6 +489,7 @@ bool JsonValue::insert(size_t pos, const std::string &key, const JsonValue &v)
     auto it = _value._o->begin();
     std::advance(it, pos);
     _value._o->insert(it, key, v);
+    for (auto& p : *_value._o) p.second._parent = this;
     return true;
 }
 
@@ -500,7 +502,7 @@ JsonValue& JsonValue::operator[] (const std::string& key)
         _value._o = new ObjectContainer;
     }
     JsonValue& rv = _value._o->operator[](key);
-    rv._owner = this;
+    rv._parent = this;
     return rv;
 }
 
@@ -1054,23 +1056,23 @@ std::string stringify (const JsonValue& v, bool sorted)
     return prettyStringify (v, "", "", "", "", sorted);
 }
 
-const JsonValue* JsonValue::owner() const
+const JsonValue* JsonValue::parent() const
 {
-    return _owner;
+    return _parent;
 }
 
 const JsonValue* JsonValue::root() const
 {
-    const JsonValue* root = this->_owner ? this->_owner : this;
-    while (root && root->_owner) root = root->_owner;
+    const JsonValue* root = this->_parent ? this->_parent : this;
+    while (root && root->_parent) root = root->_parent;
     return root;
 }
 
 JsonValue JsonValue::key() const
 {
-    if (_owner != 0)
+    if (_parent != 0)
     {
-        for (const auto& p : * (this->_owner))
+        for (const auto& p : * (this->_parent))
         {
             if (&(p.value) == this) return p.key;
         }
@@ -1080,10 +1082,10 @@ JsonValue JsonValue::key() const
 
 int JsonValue::pos() const
 {
-    if (_owner != 0)
+    if (_parent != 0)
     {
         int rv = 0;
-        for (const auto& p : * (this->_owner))
+        for (const auto& p : * (this->_parent))
         {
             if (&(p.value) == this) return rv;
             ++rv;
@@ -1120,10 +1122,10 @@ std::string JsonValue::getPointer() const
 {
     std::string ptr;
     const JsonValue* v = this;
-    while (v && v->_owner)
+    while (v && v->_parent)
     {
         ptr = "/" + v->key().asString() + ptr;
-        v = v->_owner;
+        v = v->_parent;
     }
     return ptr;
 }
