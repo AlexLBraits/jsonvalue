@@ -912,7 +912,7 @@ JsonValue parse_file (const char* fileName)
     char* js = 0;
     size_t filesize = 0;
 
-    FILE* f = fopen (fileName, "r");
+    FILE* f = fopen (fileName, "rb");
     if (f == 0)
     {
         return res;

@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+typedef uint16_t u_int16_t;
 typedef uint32_t u_int32_t;
 
 #ifdef _MSC_VER
