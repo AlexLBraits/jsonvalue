@@ -449,11 +449,7 @@ JsonValue& JsonValue::operator[] (size_t key)
     {
         size_t oldSize = _value._a->size();
         _value._a->resize (key + 1);
-
-        auto it = _value._a->begin();
-        for (std::advance(it, oldSize); it != _value._a->end(); ++it)
-            it->_parent = this;
-
+        for (auto& rv : * (_value._a)) rv._parent = this;
         return _value._a->back ();
     }
 }
@@ -481,7 +477,7 @@ bool JsonValue::insert(size_t pos, const JsonValue &v)
 
 bool JsonValue::insert(size_t pos, const std::string &key, const JsonValue &v)
 {
-    if (_type != OBJECT || pos > _value._a->size())
+    if (_type != OBJECT || pos > _value._o->size())
     {
         return false;
     }
@@ -631,10 +627,12 @@ JsonValue JsonValue::operator+ (const JsonValue& v) const
                 rv._value._a->end(),
                 v._value._a->begin(),
                 v._value._a->end());
+            for (auto& rv : * (_value._a)) rv._parent = this;
             break;
 
         default:
             rv._value._a->insert(rv._value._a->end(), v);
+            for (auto& rv : * (_value._a)) rv._parent = this;
             break;
         }
         return rv;
@@ -685,10 +683,12 @@ JsonValue JsonValue::operator| (const JsonValue& v) const
                 rv._value._a->end(),
                 v._value._a->begin(),
                 v._value._a->end());
+            for (auto& rv : * (_value._a)) rv._parent = this;
             break;
 
         default:
             rv._value._a->insert(rv._value._a->end(), v);
+            for (auto& rv : * (_value._a)) rv._parent = this;
             break;
         }
         return rv;
