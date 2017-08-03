@@ -158,11 +158,11 @@ private:
         double _d;
     } _value;
 
-    static const JsonValue _emptyValue;
+    static const JsonValue _dummyValue;
 
 public:
     static const JsonValue& emptyValue();
-    bool isEmptyValue() const;
+    bool isDummyValue() const;
 
     /////////////////////////////////////////////////////////////////////////
     // Итератор Value сделан для обхода через Range-based for loop

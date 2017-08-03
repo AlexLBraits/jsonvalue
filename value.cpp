@@ -38,7 +38,7 @@ KeyValue::KeyValue(JsonValue& v) : value(v)
 //
 //
 //////////////////////////////////////////////////////////////////////////////
-const JsonValue JsonValue::_emptyValue;
+const JsonValue JsonValue::_dummyValue;
 
 JsonValue::JsonValue(Type type) : _type(type), _parent(0)
 {
@@ -212,12 +212,12 @@ void JsonValue::reset ()
 
 const JsonValue &JsonValue::emptyValue()
 {
-    return _emptyValue;
+    return _dummyValue;
 }
 
-bool JsonValue::isEmptyValue() const
+bool JsonValue::isDummyValue() const
 {
-    return this == &_emptyValue;
+    return this == &_dummyValue;
 }
 
 JsonValue::Iterator JsonValue::begin() const
@@ -516,7 +516,7 @@ const JsonValue& JsonValue::operator[] (const std::string& key) const
     default:
         break;
     }
-    return _emptyValue;
+    return _dummyValue;
 }
 
 const JsonValue& JsonValue::operator[] (size_t key) const
@@ -532,7 +532,7 @@ const JsonValue& JsonValue::operator[] (size_t key) const
     default:
         break;
     }
-    return _emptyValue;
+    return _dummyValue;
 }
 
 size_t JsonValue::size () const
@@ -1096,7 +1096,7 @@ int JsonValue::pos() const
 
 const JsonValue& JsonValue::at(int pos) const
 {
-    if (pos < 0 || pos >= (int)this->size()) return _emptyValue;
+    if (pos < 0 || pos >= (int)this->size()) return _dummyValue;
 
     switch (_type)
     {
@@ -1115,7 +1115,7 @@ const JsonValue& JsonValue::at(int pos) const
     default:
         break;
     }
-    return _emptyValue;
+    return _dummyValue;
 }
 
 std::string JsonValue::getPointer() const
@@ -1167,7 +1167,7 @@ const JsonValue &JsonValue::evalPointer(const std::string& ptr,
             }
         }
 
-        prv = &_emptyValue;
+        prv = &_dummyValue;
         break;
     }
     return *prv;
@@ -1179,17 +1179,17 @@ bool JsonValue::isReference() const
                (type() == JsonValue::STRING) &&
                (_value._s->at(0) == '/') &&
                (*(_value._s) != this->getPointer())
-           );
+                );
 }
 
 JsonValue& JsonValue::getReference() const
 {
     const JsonValue* ptr = this;
-    while (ptr != &_emptyValue && ptr->isReference())
+    while (ptr != &_dummyValue && ptr->isReference())
     {
         ptr = &(ptr->evalPointer(ptr->asString()));
     }
-    return *(JsonValue*)(ptr == &_emptyValue ? this : ptr);
+    return *(JsonValue*)(ptr == &_dummyValue ? this : ptr);
 }
 
 
