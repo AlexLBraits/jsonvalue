@@ -921,7 +921,9 @@ JsonValue parse_file (const char* fileName)
     fseek(f, 0, SEEK_END);
     filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
+    
     js = (char*)malloc(filesize + 1);
+    
     if (js)
     {
         fread(js, 1, filesize, f);
@@ -933,6 +935,10 @@ JsonValue parse_file (const char* fileName)
         }
         res = parse_string (js);
         free(js);
+    }
+    else
+    {
+        fclose(f);
     }
     return res;
 }
