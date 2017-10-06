@@ -73,7 +73,7 @@ public:
     JsonValue (size_t v);
     JsonValue (double v);
     JsonValue (const char* v);
-    JsonValue (const char* v, int);
+    JsonValue (char* buffer, size_t size, bool itIsString = false);
     JsonValue (const std::string& v);
     JsonValue (std::string&& v);
 
@@ -264,7 +264,8 @@ struct KeyValue
     explicit KeyValue(JsonValue& v);
 };
 
-JsonValue parse_string (const char* js);
+JsonValue parse_string (const char* string);
+JsonValue parse_buffer (char* buffer, size_t size);
 JsonValue parse_file (const char* fileName);
 
 std::string stringify (const JsonValue& v, bool sorted = false);

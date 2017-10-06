@@ -108,41 +108,50 @@ JsonValue::JsonValue(std::string&& v) : _type(STRING), _parent(0)
 }
 
 /* ХИТРЫЙ КОНСТРУКТОР для объектов, прочитанных из потока */
-JsonValue::JsonValue(const char* v, int) : _type(UNDEFINED), _parent(0)
+JsonValue::JsonValue (char* buffer, size_t size, bool itIsString)
+: _type(UNDEFINED), _parent(0)
 {
     double d = 0;
     long long l = 0;
     char *p = 0;
+    char lc = *(buffer + size);
+    *(buffer + size) = 0;
     
-    if (l = strtoll(v, &p, 10), *p == 0 && errno != ERANGE) /* ЦЕЛОЕ ЧИСЛО ... */
+    if (itIsString) goto parse_string;
+    
+    if (l = strtoll(buffer, &p, 10), (*p == 0)) /* ЦЕЛОЕ ЧИСЛО ... */
     {
-        _type = INTEGER;
+        _type     = INTEGER;
         _value._i = l;
     }
-    else if (d = strtod(v, &p), *p == 0) /* ЧИСЛО С ПЛАВАЮЩЕЙ ... */
+    else if (d = strtod(buffer, &p), (*p == 0)) /* ЧИСЛО С ПЛАВАЮЩЕЙ ... */
     {
-        _type = NUMBER;
+        _type     = NUMBER;
         _value._d = d;
     }
-    else if (strcmp(v, "true") == 0)
+    else if (strcmp(buffer, "true") == 0)
     {
-        _type = BOOLEAN;
+        _type     = BOOLEAN;
         _value._l = true;
     }
-    else if (strcmp(v, "false") == 0)
+    else if (strcmp(buffer, "false") == 0)
     {
-        _type = BOOLEAN;
+        _type     = BOOLEAN;
         _value._l = false;
     }
-    else if (strcmp(v, "null") == 0)
+    else if (strcmp(buffer, "null") == 0)
     {
-        
     }
     else
     {
+    parse_string:
         _type = STRING;
-        _value._s = new std::string (v);
+        _value._s = new std::string(buffer, size);
+        std::string& ps = *(_value._s);
+        size_t r = (size_t)u8_unescape(&ps[0], (int)size, ps.c_str());
+        ps.resize(r);
     }
+    *(buffer + size) = lc;
 }
 
 JsonValue::Type JsonValue::type() const
@@ -803,73 +812,64 @@ ArrayContainer* JsonValue::asArray () const
 //
 //
 //////////////////////////////////////////////////////////////////////////////
-std::string jsmn_dump_string_token (jsmntok_t *obj, char* js)
+inline std::string jsmn_dump_string_token (jsmntok_t *obj, char* js)
 {
-    if (!js || !*js || obj->start < 0 || obj->end < obj->start) return std::string();
-    
-    size_t source_len = obj->end - obj->start;
-    
-    char* buf = get_buf(source_len + 1);
-    
-    if (buf)
-    {
-        strncpy (buf, js + obj->start, source_len);
-        buf[source_len] = 0;
-        int unescaped_len = u8_unescape (buf, source_len, buf);
-//        buf[unescaped_len] = 0;
-        return std::string(buf, buf + unescaped_len);
-    }
-    return std::string();
+    return std::string(js + obj->start, (size_t)(obj->end - obj->start));
 }
 
 JsonValue jsmn_dump_token (jsmntok_t **pobj, char* js)
 {
     jsmntok_t* obj = *pobj;
-
+    
     switch (obj->type)
     {
-    case JSMN_PRIMITIVE:
-    case JSMN_STRING:
-    {
-        std::string s = jsmn_dump_string_token (*pobj, js);
-        return (obj->type == JSMN_PRIMITIVE) ? JsonValue (s.c_str(), 0) : JsonValue (s);
-    }
-
-    case JSMN_ARRAY:
-    {
-        JsonValue arr(JsonValue::Type::ARRAY);
-        ArrayContainer& ac = *(arr.asArray());
-        for (int i = 0, osz = obj->size; i < osz; ++i)
+        case JSMN_PRIMITIVE:
+        case JSMN_STRING:
         {
-            ac.emplace_back(jsmn_dump_token (&(++(*pobj)), js));
+            return JsonValue(js + obj->start, (size_t)(obj->end - obj->start), (obj->type==JSMN_STRING));
         }
-        return arr;
-    }
 
-    case JSMN_OBJECT:
-    {
-        JsonValue obj2(JsonValue::Type::OBJECT);
-        for (int i = 0, osz = obj->size; i < osz; ++i)
+        case JSMN_ARRAY:
         {
-            std::string s = jsmn_dump_string_token (++(*pobj), js);
-            obj2[s] = jsmn_dump_token (&(++(*pobj)), js);
+            JsonValue arr(JsonValue::Type::ARRAY);
+            ArrayContainer& ac = *(arr.asArray());
+            for (int i = 0, osz = obj->size; i < osz; ++i)
+            {
+                ac.emplace_back(jsmn_dump_token (&(++(*pobj)), js));
+            }
+            return arr;
         }
-        return obj2;
-    }
-
-    default:
-        return JsonValue ();
+            
+        case JSMN_OBJECT:
+        {
+            JsonValue obj2(JsonValue::Type::OBJECT);
+            for (int i = 0, osz = obj->size; i < osz; ++i)
+            {
+                obj2[jsmn_dump_string_token (++(*pobj), js)] = jsmn_dump_token (&(++(*pobj)), js);
+            }
+            return obj2;
+        }
+            
+        default:
+            return JsonValue ();
     }
 }
 
-JsonValue parse_string (const char* js)
+JsonValue parse_string(const char* string)
+{
+    std::string s(string);
+    return parse_buffer(&s[0], s.size());
+}
+
+JsonValue parse_buffer (char* bufferHead, size_t bufferSize)
 {
     JsonValue res;
+    
     int r;
-    int num_tokens = 1024;
+    unsigned int num_tokens = 1024;
     jsmntok_t* tokens = 0;
     jsmn_parser parser;
-    int jsL = strlen (js);
+    jsmn_init (&parser);
 
 LOOP_JSMN_ERROR_NOMEM:
 
@@ -879,13 +879,12 @@ LOOP_JSMN_ERROR_NOMEM:
         exit(EXIT_FAILURE);
     }
 
-    jsmn_init (&parser);
-    r = jsmn_parse (&parser, js, jsL, tokens, num_tokens);
+    r = jsmn_parse (&parser, bufferHead, bufferSize, tokens, num_tokens);
 
     if ( r >= 0 )
     {
         jsmntok_t *T = tokens;
-        res = jsmn_dump_token (&T, (char*)js);
+        res = jsmn_dump_token (&T, (char*)bufferHead);
 
     }
     else if (r == JSMN_ERROR_NOMEM )
@@ -918,27 +917,15 @@ JsonValue parse_file (const char* fileName)
         return res;
     }
 
-    fseek(f, 0, SEEK_END);
-    filesize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    
-    js = (char*)malloc(filesize + 1);
-    
-    if (js)
-    {
-        fread(js, 1, filesize, f);
+    fseek(f,0,SEEK_END);
+    filesize=(size_t)ftell(f);
+    fseek(f,0,SEEK_SET);
+    js=(char*)malloc(filesize);
+    if (js) {
+        filesize = fread(js, 1, filesize, f);
         fclose(f);
-        js[filesize] = 0;
-        if (js == 0)
-        {
-            return res;
-        }
-        res = parse_string (js);
+        res = parse_buffer (js, filesize);
         free(js);
-    }
-    else
-    {
-        fclose(f);
     }
     return res;
 }
